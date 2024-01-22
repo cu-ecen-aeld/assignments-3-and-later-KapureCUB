@@ -32,17 +32,17 @@ then
                     STRING=$2
                     GTG=1
                 else
-                    echo "filesdir does not represent a directory on the file system"
+                    echo "Error 1: filesdir does not represent a directory on the file system"
 		    help_log
                     exit 1
                 fi
 	else
-            echo "searchstr parameter not specified"
+            echo "Error 1: searchstr parameter not specified"
 	    help_log
             exit 1
         fi
 else
-	echo "filesdir parameter not specified."
+	echo "Error 1: filesdir parameter not specified."
         help_log
 	exit 1
 fi
@@ -56,7 +56,6 @@ then
     # preserve the FILECNT and MATCHCNT
     while IFS= read -r -d $'\0' FILE
     do
-        echo "Processing $FILE"
         FILECNT=$((FILECNT+1))
         cmd=$(grep -c "${STRING}" "${FILE}")
         MATCHCNT=$((MATCHCNT+cmd))

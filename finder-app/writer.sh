@@ -38,18 +38,18 @@ then
 		    then
 			    GTG=1
 		    else
-                        echo "Unable to create file ${FILE}"
+                        echo "Error 1: Unable to create file ${FILE}"
 			help_log
                         exit 1
 		    fi
                 fi
         else
-            echo "writestr parameter not specified"
+            echo "Error 1: writestr parameter not specified"
 	    help_log
             exit 1
         fi
 else
-        echo "writefile parameter not specified."
+        echo "Error 1: writefile parameter not specified."
 	help_log
         exit 1
 fi
