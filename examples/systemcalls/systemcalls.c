@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
 
 /**
  * @param cmd the command to execute with system()
@@ -82,8 +89,8 @@ bool do_exec(int count, ...)
     }
     // check status of child
     if(wait(&stat) == -1) {
-        print("Child process failed. Exit status - %d", &stat);
-        retun false;
+        printf("Child process failed. Exit status - %d", &stat);
+        return false;
     }
 
     va_end(args);
@@ -145,7 +152,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     }
     // check status of child
     if(wait(&stat) == -1) {
-        print("Child process failed. Exit status - %d", stat);
+        printf("Child process failed. Exit status - %d", stat);
         close(fd);
         return false;
     }
