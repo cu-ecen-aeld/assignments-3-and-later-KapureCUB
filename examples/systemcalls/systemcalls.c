@@ -26,7 +26,7 @@ bool do_system(const char *cmd)
     int ret;
     ret = system(cmd);
     if(ret == -1) {
-        printf("Error in executing system() for command %s. Errno - %d", *cmd, errno);
+        printf("Error in executing system() for command %s. Errno - %d", cmd, errno);
         return false; 
     }
 
@@ -83,13 +83,15 @@ bool do_exec(int count, ...)
     // child process
     else if(pid == 0) {
         // perform execv
-        execv(command[0], command[1]);
+        const char * arg[count];
+        memcpy(arg, &command[1], count);
+        execv(command[0], arg);
         printf("Error occurred in child during execv(). Errno - %d\n", errno);
         return false
     }
     // check status of child
     if(wait(&stat) == -1) {
-        printf("Child process failed. Exit status - %d", &stat);
+        printf("Child process failed. Exit status - %d", stat);
         return false;
     }
 
