@@ -2,12 +2,6 @@
 # Tester script for assignment 1 and assignment 2
 # Author: Siddhant Jajoo
 
-# clean any previous build artifacts
-make clean
-
-# build native compilation
-make 
-
 set -e
 set -u
 

@@ -16,6 +16,12 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int ret;
+    ret = system(cmd);
+    if(ret == -1) {
+        printf("Error in executing system() for command %s. Errno - %d", *cmd, errno);
+        return false; 
+    }
 
     return true;
 }
@@ -58,6 +64,27 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t pid;
+    int stat;
+
+    // fork the parent process
+    pid = fork();
+    if(pid == -1) {
+        printf("Error in executing fork(). Errno - %d\n", errno);
+        return false;
+    }
+    // child process
+    else if(pid == 0) {
+        // perform execv
+        execv(command[0], command[1]);
+        printf("Error occurred in child during execv(). Errno - %d\n", errno);
+        return false
+    }
+    // check status of child
+    if(wait(&stat) == -1) {
+        print("Child process failed. Exit status - %d", &stat);
+        retun false;
+    }
 
     va_end(args);
 
@@ -92,8 +119,38 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    pid_t pid;
+    int stat, fd;
 
+    fd = open(outputfile, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    pid = fork();
+    if(pid == -1) {
+        printf("Error in executing fork(). Errno - %d\n", errno);
+        close(fd);
+        return false;
+    }
+    // child process
+    else if(pid == 0) {
+        // redirect stdout to outputfile
+        if (dup2(fd, 1) == -1) { 
+            printf("Error in redirecting stdout to file %s. Errno - %d", outputfile, errno);
+            close(fd);
+            return false;
+        }
+        // perform execv
+        execv(command[0], command[1]);
+        printf("Error occurred in child during execv(). Errno - %d\n", errno);
+        close(fd);
+        return false;
+    }
+    // check status of child
+    if(wait(&stat) == -1) {
+        print("Child process failed. Exit status - %d", stat);
+        close(fd);
+        return false;
+    }
     va_end(args);
 
+    close(fd);
     return true;
 }
