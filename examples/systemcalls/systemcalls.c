@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <string.h>
 
 
 /**
@@ -83,7 +84,7 @@ bool do_exec(int count, ...)
     // child process
     else if(pid == 0) {
         // perform execv
-        const char * arg[count];
+        char *const *arg[count];
         memcpy(arg, &command[1], count);
         execv(command[0], arg);
         printf("Error occurred in child during execv(). Errno - %d\n", errno);
@@ -147,7 +148,9 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
             return false;
         }
         // perform execv
-        execv(command[0], command[1]);
+        char *const *arg[count];
+        memcpy(arg, &command[1], count);
+        execv(command[0], arg);
         printf("Error occurred in child during execv(). Errno - %d\n", errno);
         close(fd);
         return false;
