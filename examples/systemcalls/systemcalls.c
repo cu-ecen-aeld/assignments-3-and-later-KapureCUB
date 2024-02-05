@@ -73,32 +73,31 @@ bool do_exec(int count, ...)
  *
 */
     pid_t pid;
-    int stat;
-
-    // fork the parent process
     pid = fork();
-    if(pid == -1) {
-        printf("Error in executing fork(). Errno - %d\n", errno);
-        return false;
-    }
-    // child process
-    else if(pid == 0) {
-        // perform execv
-        char *const *arg[count];
-        memcpy(arg, &command[1], count);
-        execv(command[0], arg);
-        printf("Error occurred in child during execv(). Errno - %d\n", errno);
-        return false
-    }
-    // check status of child
-    if(wait(&stat) == -1) {
-        printf("Child process failed. Exit status - %d", stat);
-        return false;
-    }
 
-    va_end(args);
-
-    return true;
+    if (pid == -1) {
+        perror("Error executing fork");
+        va_end(args);
+        return false;
+    } else if (pid == 0) {
+        // Child process.Calling execv
+        execv(command[0], command);
+        // If execv fails
+	perror("Error executing execv"); 
+	exit(EXIT_FAILURE);
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+        // check status of waitpid
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            va_end(args);
+            return true;
+        } else {
+            va_end(args);
+            return false;
+        }
+    }
 }
 
 /**
@@ -130,39 +129,46 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
     pid_t pid;
-    int stat, fd;
-
-    fd = open(outputfile, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    
+    // creating a child process
     pid = fork();
-    if(pid == -1) {
-        printf("Error in executing fork(). Errno - %d\n", errno);
-        close(fd);
+
+    if (pid == -1) {
+	//print error using perror
+        perror("Error executing fork");
+        va_end(args);
         return false;
-    }
-    // child process
-    else if(pid == 0) {
-        // redirect stdout to outputfile
-        if (dup2(fd, 1) == -1) { 
-            printf("Error in redirecting stdout to file %s. Errno - %d", outputfile, errno);
-            close(fd);
+
+    } else if (pid == 0) {
+        // Child process
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd == -1) {
+	    // print error using perror
+            perror("Error opening output file");
+            exit(EXIT_FAILURE);
+        }
+	// redirect stdout to outputfile
+        dup2(fd, STDOUT_FILENO);
+        // closing file
+	close(fd);
+	
+	// call execv
+        execv(command[0], command);
+	// If execv fails
+        perror("Error executing execv");  
+        exit(EXIT_FAILURE);
+
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+	// check for status 
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            va_end(args);
+            return true;
+        } else {
+            va_end(args);
             return false;
         }
-        // perform execv
-        char *const *arg[count];
-        memcpy(arg, &command[1], count);
-        execv(command[0], arg);
-        printf("Error occurred in child during execv(). Errno - %d\n", errno);
-        close(fd);
-        return false;
     }
-    // check status of child
-    if(wait(&stat) == -1) {
-        printf("Child process failed. Exit status - %d", stat);
-        close(fd);
-        return false;
-    }
-    va_end(args);
-
-    close(fd);
-    return true;
 }
