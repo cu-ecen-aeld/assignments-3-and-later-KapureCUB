@@ -13,6 +13,7 @@ FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
 CROSS_COMPILE=aarch64-none-linux-gnu-
 
+
 if [ $# -lt 1 ]
 then
 	echo "Using default directory ${OUTDIR} for output"
@@ -103,7 +104,7 @@ sudo mknod -m 666 ${OUTDIR}/rootfs/dev/console c 5 1
 
 
 # TODO: Clean and build the writer utility
-FILE=$(find ~/aesd/Assignment3_part1 -name finder-app)
+FILE=$(find ${FINDER_APP_DIR} -name finder-app)
 cd "$FILE" 
 make clean
 make CROSS_COMPILE=${CROSS_COMPILE}
@@ -114,13 +115,13 @@ cp ${FILE}/writer ${OUTDIR}/rootfs/home
 cp ${FILE}/finder* ${OUTDIR}/rootfs/home
 
 mkdir -p ${OUTDIR}/rootfs/home/conf
-FILE=$(find ~/aesd/Assignment3_part1 -name assignment.txt)
+FILE=$(find ${FINDER_APP_DIR} -name assignment.txt)
 cp ${FILE} ${OUTDIR}/rootfs/home/conf
 
-FILE=$(find ~/aesd/Assignment3_part1 -name username.txt)
+FILE=$(find ${FINDER_APP_DIR} -name username.txt)
 cp ${FILE} ${OUTDIR}/rootfs/home/conf
 
-FILE=$(find ~/aesd/Assignment3_part1 -name autorun-qemu.sh)
+FILE=$(find ${FINDER_APP_DIR} -name autorun-qemu.sh)
 cp ${FILE} ${OUTDIR}/rootfs/home/
 
 # TODO: Chown the root directory
