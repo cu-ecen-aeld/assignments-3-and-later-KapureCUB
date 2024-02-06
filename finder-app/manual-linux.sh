@@ -85,17 +85,20 @@ echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
+# find sysroot 
+SYSROOT=$(aarch64-none-linux-gnu-gcc -print-sysroot)
+
 # TODO: Add library dependencies to rootfs
-PI=$(find ~/ -name ld-linux-aarch64.so.1)
+PI=$(find ${SYSROOT} -name ld-linux-aarch64.so.1)
 cp ${PI} ${OUTDIR}/rootfs/lib 
 
-PI=$(find ~/ -name libm.so.6)
+PI=$(find ${SYSROOT} -name libm.so.6)
 cp ${PI} ${OUTDIR}/rootfs/lib64
 
-PI=$(find ~/ -name libresolv.so.2)
+PI=$(find ${SYSROOT} -name libresolv.so.2)
 cp ${PI} ${OUTDIR}/rootfs/lib64
 
-PI=$(find ~/ -name libc.so.6)
+PI=$(find ${SYSROOT} -name libc.so.6)
 cp ${PI} ${OUTDIR}/rootfs/lib64
 
 # TODO: Make device nodes
