@@ -41,7 +41,7 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     
     make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all
 
-    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
+    #make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
 
     make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
 fi
@@ -57,7 +57,8 @@ then
 fi
 
 # TODO: Create necessary base directories
-mkdir -p bin dev etc home lib lib64 proc sbin sys tmp usr var
+mkdir -p ${OUTDIR}/rootfs && cd ${OUTDIR}/rootfs
+mkdir -p bin etc dev home lib lib64 proc sbin sys tmp usr var
 mkdir -p usr/bin usr/lib usr/sbin 
 mkdir -p var/log 
 
@@ -78,26 +79,28 @@ make defconfig
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} 
 make CONFIG_PREFIX=${OUTDIR}/rootfs ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
 
+cd "$OUTDIR/rootfs"
 echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
 # TODO: Add library dependencies to rootfs
 PI=$(find ~/ -name ld-linux-aarch64.so.1)
-cp ${PI} ${OUTDIR}/lib 
+cp ${PI} ${OUTDIR}/rootfs/lib 
 
 PI=$(find ~/ -name libm.so.6)
-cp ${PI} ${OUTDIR}/lib64
+cp ${PI} ${OUTDIR}/rootfs/lib64
 
 PI=$(find ~/ -name libresolv.so.2)
-cp ${PI} ${OUTDIR}/lib64
+cp ${PI} ${OUTDIR}/rootfs/lib64
 
 PI=$(find ~/ -name libc.so.6)
-cp ${PI} ${OUTDIR}/lib64
+cp ${PI} ${OUTDIR}/rootfs/lib64
 
 # TODO: Make device nodes
-sudo mknod -m 666 /dev/null c 1 3 
-sudo mknod -m 666 /dev/console c 5 1 
+sudo mknod -m 666 ${OUTDIR}/rootfs/dev/null c 1 3
+sudo mknod -m 666 ${OUTDIR}/rootfs/dev/console c 5 1 
+
 
 # TODO: Clean and build the writer utility
 FILE=$(find ~/aesd/Assignment3_part1 -name finder-app)
@@ -107,20 +110,25 @@ make CROSS_COMPILE=${CROSS_COMPILE}
 
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
-cp ${FILE}/writer ${OUTDIR}/home
-cp ${FILE}/finder* ${OUTDIR}/home
+cp ${FILE}/writer ${OUTDIR}/rootfs/home
+cp ${FILE}/finder* ${OUTDIR}/rootfs/home
 
-mkdir -p ${OUTDIR}/home/conf
+mkdir -p ${OUTDIR}/rootfs/home/conf
 FILE=$(find ~/aesd/Assignment3_part1 -name assignment.txt)
-cp ${FILE} ${OUTDIR}/home/conf
+cp ${FILE} ${OUTDIR}/rootfs/home/conf
 
 FILE=$(find ~/aesd/Assignment3_part1 -name username.txt)
-cp ${FILE} ${OUTDIR}/home/conf
+cp ${FILE} ${OUTDIR}/rootfs/home/conf
+
+FILE=$(find ~/aesd/Assignment3_part1 -name autorun-qemu.sh)
+cp ${FILE} ${OUTDIR}/rootfs/home/
 
 # TODO: Chown the root directory
-cd ${OUTDIR}/home && chmod 744 *
+cd ${OUTDIR}/rootfs/ && sudo chown -R root:root *
 
 # TODO: Create initramfs.cpio.gz
 cd "$OUTDIR/rootfs"
 find . | cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
+cd "$OUTDIR"
 gzip -f initramfs.cpio
+cp ${OUTDIR}/linux-stable/arch/arm64/boot/Image ${OUTDIR}
