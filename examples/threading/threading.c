@@ -3,13 +3,17 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 // Optional: use these functions to add debug or error prints to your application
 #define DEBUG_LOG(msg,...)
 //#define DEBUG_LOG(msg,...) printf("threading: " msg "\n" , ##__VA_ARGS__)
 #define ERROR_LOG(msg,...) printf("threading ERROR: " msg "\n" , ##__VA_ARGS__)
+
+
 // convert msec to usec
 #define MILLISECOND_TO_USEC    (1000)
+
 
 void* threadfunc(void* thread_param)
 {
@@ -27,7 +31,7 @@ void* threadfunc(void* thread_param)
     // call lock on mutex
     ret = pthread_mutex_lock(args->mutex);
     if(ret != 0) {
-        ERROR_LOG("Error in acquiring lock in TID %d. %s", pthread_self(), strerror(errno));
+        ERROR_LOG("Error in acquiring lock in TID %lu. %s", pthread_self(), strerror(errno));
     }
     
     // wait for relaese
@@ -36,7 +40,7 @@ void* threadfunc(void* thread_param)
     // call unlock on mutex
     ret = pthread_mutex_unlock(args->mutex);
     if(ret != 0) {
-        ERROR_LOG("Error in releasing lock in TID %d. %s", pthread_self(), strerror(errno));
+        ERROR_LOG("Error in releasing lock in TID %lu. %s", pthread_self(), strerror(errno));
     } else {
         local_success = true;
     }
@@ -65,7 +69,7 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
     int ret_thread;
 
     // dynamically allocated memory for thread data
-    thread_data *thread_param             = malloc(sizeof(thread_data));
+    struct thread_data *thread_param             = malloc(sizeof(struct thread_data));
     
     // filling in the thread data parameters
     thread_param->wait_to_obtain_ms       = wait_to_obtain_ms;
@@ -79,7 +83,7 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
         DEBUG_LOG("Thread with TID %d started succesfully.", *thread);
         ret = true;
     } else {
-        ERROR_LOG("Error creating thread with TID %d. %s" *thread, strerror(errno));
+        ERROR_LOG("Error creating thread with TID %lu. %s", *thread, strerror(errno));
     }
 
     return ret;
