@@ -25,12 +25,27 @@ int socket_fd;
 int signal_caught = 0;
 char host[NI_MAXHOST];     // for getting connection logs
 
+/**************************************************************************//**
+ * Signal handler function. Called when a SIGINT or SIGTERM event is triggered.
+ *
+ * @param[in] sig - signal num caught
+ *
+ *****************************************************************************/
 static void signal_handler(int sig) {
     signal_caught = sig;
     shutdown(socket_fd, SHUT_RDWR); // shutdown socket
 }
 
-
+/**************************************************************************//**
+ * Send data to client. Reads data from OUTPUT_FILE_PATH and sends it over the 
+ * socket connection.
+ *
+ * @param[in] socket - FD of socket file created
+ * @param[in] fd     - FD of OUTPUT_FILE_PATH
+ * 
+ * @return    ret    - success(0) or failure(-1) 
+ *
+ *****************************************************************************/
 static int send_data_to_client(int socket, FILE * fd) {
     
     int ret = 0;
@@ -56,6 +71,16 @@ static int send_data_to_client(int socket, FILE * fd) {
     return ret;
 }
 
+
+/**************************************************************************//**
+ * Read packet from socket connection and write it to OUTPUT_FILE_PATH.
+ *
+ * @param[in] socket - FD of socket file created
+ * @param[in] fd     - FD of OUTPUT_FILE_PATH
+ * 
+ * @return    ret    - success(0) or failure(-1) 
+ *
+ *****************************************************************************/
 static int read_packet(int socket, FILE * fd) {
     
     int result = 0;
@@ -91,6 +116,14 @@ static int read_packet(int socket, FILE * fd) {
     return result;
 }
 
+
+/**************************************************************************//**
+ * Function to initialize the socket. Creates a socket FD and start listening 
+ * at the created connection.
+ * 
+ * @return    ret_val - returns FD of socket connection or failure(-1) 
+ *
+ *****************************************************************************/
 static int aesd_socket_init(void) {
     // socket variables 
     int ret;
@@ -165,6 +198,15 @@ static int aesd_socket_init(void) {
     return ret_val;
 }
 
+
+/**************************************************************************//**
+ * Accept socket connection and create a new FD for the transfer of data.
+ *
+ * @param[in] socket - FD of socket file created
+ * 
+ * @return    new_socket_fd - returns new FD of socket or failure(-1) 
+ *
+ *****************************************************************************/
 static int socket_accept(int socket_fd) {
     int ret;
     int new_socket_fd;
@@ -188,6 +230,7 @@ static int socket_accept(int socket_fd) {
 
     return new_socket_fd;
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -279,11 +322,7 @@ int main(int argc, char *argv[])
             fclose(fd);
             continue;
         }
-        // // connection stopped
-        // if(ret == 0) { 
-        //     fclose(fd);
-        //     continue;
-        // }
+
         // close file to reopen
         fclose(fd);
 
@@ -308,7 +347,7 @@ int main(int argc, char *argv[])
         close(socket_fd);               // close socket
         remove(OUTPUT_FILE_PATH);       // remove log file
     }
-    closelog();                     // close log
+    closelog();                         // close log
     
     return 0;
 }
