@@ -44,12 +44,12 @@ static int send_data_to_client(int socket, FILE * fd) {
         packet_ptr = read_buffer;
         sent_cnt = send(socket, packet_ptr, bytes_read, 0);
         if (sent_cnt == -1) {
-            syslog(LOG_ERR, "Unable to send data to client\n\r");
+            syslog(LOG_ERR, "Unable to send data to client\n");
             ret = -1;
             break;
         }
         memset(read_buffer, 0, MAX_BUFFER_SIZE);
-        syslog(LOG_INFO, "Sent %lu bytes to client\n\r", sent_cnt);
+        syslog(LOG_INFO, "Sent %lu bytes to client\n", sent_cnt);
     }
 
     return ret;
@@ -68,12 +68,12 @@ static int read_packet(int socket, FILE * fd) {
         if(byte_read == -1) {
             continue_read = 0;
             result = -1;
-            syslog(LOG_ERR, "Error reading data from socket\n\r");
+            syslog(LOG_ERR, "Error reading data from socket\n");
         } else  if(byte_read == 0) {  
             continue_read = 0;
             result = -1;
         } else {
-            syslog(LOG_ERR, "Received %lu bytes from client\n\r", byte_read);
+            syslog(LOG_ERR, "Received %lu bytes from client\n", byte_read);
             // check for \n
             char *nl_char = memchr(read_buffer, '\n', MAX_BUFFER_SIZE);
             continue_read = (nl_char == NULL) ? 1:0;
@@ -83,7 +83,7 @@ static int read_packet(int socket, FILE * fd) {
             // clear read_buffer
             memset(read_buffer, 0, MAX_BUFFER_SIZE);
 
-            syslog(LOG_INFO, "Data written to file\n\r");
+            syslog(LOG_INFO, "Data written to file\n");
         }
     }
 
@@ -98,9 +98,9 @@ static int aesd_socket_init(void) {
     struct addrinfo hints;
     struct addrinfo *servinfo; 
     
-    memset(&hints,   0, sizeof(struct addrinfo));
+    memset(&hints,   0, sizeof(hints));
 
-    hints.ai_family   = AF_UNSPEC;
+    hints.ai_family   = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags    = AI_PASSIVE;
 
@@ -108,7 +108,7 @@ static int aesd_socket_init(void) {
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_fd == -1) {
         syslog(LOG_ERR, "Error creating socket: \
-                         Unable to create file describtor\n\r");
+                         Unable to create file describtor\n");
         return -1;
     } else {
         // setup SOCKOPTS for reusing the address SO_REUSEADDR
@@ -118,17 +118,17 @@ static int aesd_socket_init(void) {
             ret = setsockopt(socket_fd, SOL_SOCKET, SO_REUSEPORT, \
                              &reuse_val, sizeof(reuse_val));
             if(ret == 0) {
-                syslog(LOG_INFO, "Socket created succesfully\n\r");
+                syslog(LOG_INFO, "Socket created succesfully\n");
             } else {
                 close(socket_fd);
                 syslog(LOG_ERR, "Error creating socket: \
-                                 Failed to setsockopt SO_REUSEPORT\n\r");
+                                 Failed to setsockopt SO_REUSEPORT\n");
                 return -1;
             }
         } else {
             close(socket_fd);
             syslog(LOG_ERR, "Error creating socket: \
-                             Failed to setsockopt SO_REUSEADDR\n\r");
+                             Failed to setsockopt SO_REUSEADDR\n");
             return -1;
         }
     }
@@ -141,7 +141,7 @@ static int aesd_socket_init(void) {
         for(struct addrinfo* itr = servinfo; itr != NULL; itr = itr->ai_next) { 
             ret = bind(socket_fd, itr->ai_addr, itr->ai_addrlen);
             if(ret == 0) { 
-                syslog(LOG_INFO, "Socket bind completed succesfully\n\r");
+                syslog(LOG_INFO, "Socket bind completed succesfully\n");
                 break;
             }
         }
@@ -150,12 +150,13 @@ static int aesd_socket_init(void) {
 
         if (ret == -1) {
             close(socket_fd);
-            syslog(LOG_ERR, "ERROR binding socket\n\r");
+            syslog(LOG_ERR, "ERROR binding socket\n");
             return -1;
         } 
     } else {
+        syslog(LOG_INFO, "Socket bind completed succesfully\n");
         close(socket_fd);
-        syslog(LOG_ERR, "Unable to get addr info\n\r");
+        syslog(LOG_ERR, "Unable to get addr info \n");
         return -1;
     }
 
@@ -165,7 +166,7 @@ static int aesd_socket_init(void) {
         ret_val = socket_fd;
     } else {
         close(socket_fd);
-        syslog(LOG_ERR, "Error occurred during listening to socket\n\r");
+        syslog(LOG_ERR, "Error occurred during listening to socket\n");
         return -1;
     }
 
@@ -216,10 +217,7 @@ int main(int argc, char *argv[])
         syslog(LOG_INFO, "Running aesdsocket as a normal process");
     } else {
         // error
-        fprintf(stderr, "ERROR, invalid arguments.\n\r  \
-                         Usage: aesdsocket\n\r          \
-                         \tOPTIONS:\n\r                 \
-                         \t\t[-d] - run as daemon.\n\r");
+        fprintf(stderr, "ERROR, invalid arguments.\nUsage: aesdsocket\nOPTIONS:\n\t[-d] - run as daemon.\n");
         exit(-1);
     }
 
@@ -236,22 +234,22 @@ int main(int argc, char *argv[])
     // setting up signal handling for SIGTERM and SIGINT
     ret = sigaction(SIGTERM, &action, NULL);
     if (ret != 0) {
-        fprintf(stderr, "Could not setup SIGTERM handler\n\r");
+        fprintf(stderr, "Could not setup SIGTERM handler\n");
         exit(-1);
     }
 
     ret = sigaction(SIGINT, &action, NULL);
     if (ret != 0) {
-        fprintf(stderr, "Could not setup SIGINT handler\n\r");
+        fprintf(stderr, "Could not setup SIGINT handler\n");
         exit(-1);
     }
 
     // start daemon process based on flag
     if (daemon_enable) {
-        syslog(LOG_INFO,"Executing Daemonization\n\r");
+        syslog(LOG_INFO,"Executing Daemonization\n");
         pid_t pid = fork();
         if(pid == -1){ 
-            syslog(LOG_ERR,"Error forking during daemon creation\n\r");
+            syslog(LOG_ERR,"Error forking during daemon creation\n");
             exit(-1);
         } else if(pid != 0) { 
             //exit in parent
@@ -306,18 +304,20 @@ int main(int argc, char *argv[])
             syslog(LOG_INFO, "Error sending data to client\n");
         }
 
-        syslog(LOG_INFO, "Closed connection from %s\n\r", host);
+        syslog(LOG_INFO, "Closed connection from %s\n", host);
         close(new_socket_fd); 
         fclose(fd);
     }
 
     // terminate routine
     syslog(LOG_INFO, "Caught signal, exiting\n"); 
-    fclose(fd);                      // close log file
-    close(new_socket_fd);           // close accepted socket
-    close(socket_fd);               // close socket
-    shutdown(socket_fd, SHUT_RDWR); // shutdown socket
-    remove(OUTPUT_FILE_PATH);       // remove log file
+    if(socket_stat) {
+        fclose(fd);                     // close log file
+        close(new_socket_fd);           // close accepted socket
+        close(socket_fd);               // close socket
+        shutdown(socket_fd, SHUT_RDWR); // shutdown socket
+        remove(OUTPUT_FILE_PATH);       // remove log file
+    }
     closelog();                     // close log
     
     return 0;
