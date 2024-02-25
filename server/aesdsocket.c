@@ -27,6 +27,7 @@ char host[NI_MAXHOST];     // for getting connection logs
 
 static void signal_handler(int sig) {
     signal_caught = sig;
+    shutdown(socket_fd, SHUT_RDWR); // shutdown socket
 }
 
 
@@ -303,10 +304,8 @@ int main(int argc, char *argv[])
     // terminate routine
     syslog(LOG_INFO, "Caught signal, exiting\n"); 
     if(socket_stat) {
-        fclose(fd);                     // close log file
         close(new_socket_fd);           // close accepted socket
         close(socket_fd);               // close socket
-        shutdown(socket_fd, SHUT_RDWR); // shutdown socket
         remove(OUTPUT_FILE_PATH);       // remove log file
     }
     closelog();                     // close log
