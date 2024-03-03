@@ -15,6 +15,8 @@
 #include <syslog.h>
 #include <signal.h>
 
+#include "queue.h"
+
 #define PORT                "9000"
 #define BACKLOGS            5
 #define OUTPUT_FILE_PATH    "/var/tmp/aesdsocketdata"
