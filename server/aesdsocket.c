@@ -16,6 +16,9 @@
 #include <signal.h>
 
 #include "queue.h"
+#include <time.h>
+#include <pthread.h>
+#include <sys/time.h>
 
 #define PORT                "9000"
 #define BACKLOGS            5
@@ -30,12 +33,12 @@ char host[NI_MAXHOST];     // for getting connection logs
 
 
 /*************************** Thread data structure ****************************/ 
-typedef struct thread_data_t {
+typedef struct {
     pthread_mutex_t* th_mutex;
     int new_socket_fd; 
     FILE * log_file_fd;
     int complete_flag; // 0-not complete; 1-success; -1-failure
-}thread_data;
+}thread_data_t;
 
 /************************** Linked list data structure ************************/ 
 typedef struct slist_thread_s slist_thread_t;
@@ -113,7 +116,7 @@ static int send_data_to_client(int socket, FILE * fd) {
  * @return    ret    - success(0) or failure(-1) 
  *
  *****************************************************************************/
-static int read_packet(int socket, FILE * fd) {
+static int read_packet(int socket, FILE * fd, pthread_mutex_t *m) {
     
     int result = 0;
     int continue_read = 1;
@@ -126,7 +129,7 @@ static int read_packet(int socket, FILE * fd) {
     if(!buff) {
         syslog(LOG_ERR, "Failure allocating dynamic buffer while reading");
         result        = -1;
-        continue_read = 0
+        continue_read = 0;
     }
 
     // allocate null character to buff
@@ -160,7 +163,7 @@ static int read_packet(int socket, FILE * fd) {
             total_byte_read += byte_read;
 
             // copy data to new allocated buff
-            strcpy(final_buffer, buf);
+            strcpy(buff, read_buffer);
 
             // check for \n 
             char *nl_char = memchr(buff, '\n', MAX_BUFFER_SIZE);
@@ -170,9 +173,9 @@ static int read_packet(int socket, FILE * fd) {
 
     // write data to file /var/tmp/aesdsocketdata
     // acquire lock
-    if(pthread_mutex_lock(&log_mutex) == 0) {
+    if(pthread_mutex_lock(m) == 0) {
         fwrite(buff, byte_read, 1, fd);
-        pthread_mutex_unlock(&log_mutex);
+        pthread_mutex_unlock(m);
 
         // perform cleanup
         free(buff);
@@ -180,7 +183,7 @@ static int read_packet(int socket, FILE * fd) {
 
         syslog(LOG_INFO, "Data written to file\n");
     } else {
-        syslog(LOG_ERR, "Failure acquiring lock for file write.");
+        syslog(LOG_ERR, "Failure acquiring lock for file write\n");
         result = -1;
     }
     return result;
@@ -309,7 +312,7 @@ static int socket_accept(int socket_fd) {
  * @return    new_socket_fd - returns new FD of socket or failure(-1) 
  *
  *****************************************************************************/
-static thread_data_t* socket_thread(thread_data_t* t_para) {
+static void* socket_thread(void* t_para) {
     
     int result = 1;
     int ret;
@@ -324,7 +327,8 @@ static thread_data_t* socket_thread(thread_data_t* t_para) {
     // continuously read
     while(1) {
         //read full packet
-        ret = read_packet(new_socket_fd, t_data->log_file_fd);
+        ret = read_packet(t_data->new_socket_fd, t_data->log_file_fd, \
+                          t_data->th_mutex);
         if(ret == -1) { 
             syslog(LOG_ERR, "Error reading via socket");
             // failed
@@ -336,7 +340,7 @@ static thread_data_t* socket_thread(thread_data_t* t_para) {
         }
 
         // retransmit the file
-        ret = send_data_to_client(new_socket_fd, t_data->log_file_fd);
+        ret = send_data_to_client(t_data->new_socket_fd, t_data->log_file_fd);
         if(ret == -1) {
             syslog(LOG_INFO, "Error sending data to client\n");
         }
@@ -395,6 +399,14 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
+    // register timer handler
+    action.sa_handler = timer_handler; 
+    ret = sigaction(SIGALRM, &action, NULL); 
+    if(ret != 0) {
+        syslog(LOG_ERR, "Could not setup SIGALRM handler\n");
+        exit(-1);
+    }
+
     // start daemon process based on flag
     if (daemon_enable) {
         syslog(LOG_INFO,"Executing Daemonization\n");
@@ -433,10 +445,10 @@ int main(int argc, char *argv[])
     delay.it_interval.tv_usec = 0;
     setitimer(ITIMER_REAL, &delay, NULL);
     
-    char data[MAX_TIME_SIZE];
-    memset(&data, 0, MAX_TIME_SIZE);
+    char data[60];
+    memset(&data, 0, sizeof(data));
     time_t rawNow;
-    struct tm* now = (struct tm*)malloc(sizeof(struct tm));;
+    struct tm* now = (struct tm*)malloc(sizeof(struct tm));
 
     // accept 
     int new_socket_fd;
@@ -497,8 +509,8 @@ int main(int argc, char *argv[])
             now = localtime_r(&rawNow, now);
             
             //format timestamp
-            memset(&data, 0, MAX_TIME_SIZE);
-            strftime(data, MAX_TIME_SIZE, RFC2822_FORMAT, now);
+            memset(&data, 0, sizeof(data));
+            strftime(data, sizeof(data), "timestamp: %Y, %m, %d, %H, %M, %S\n", now);
 
             ret = pthread_mutex_lock(&mutex);
             if(ret != 0) {
@@ -523,19 +535,21 @@ int main(int argc, char *argv[])
                 SLIST_REMOVE(&head, tp, slist_thread_s, entries);
                 
                 //join 
-                thread_data_t* t_ret = NULL;
+                void* t_ret = NULL;
                 ret = pthread_join(tp->thread, &t_ret);
                 if(ret != 0) {
                     syslog(LOG_ERR, "Failed to end thread:%ld", tp->thread);
                     socket_stat = 0;
                 }
                 
+                thread_data_t* tmp_ret = (thread_data_t *) t_ret;
+
                 //close the socket
                 syslog(LOG_DEBUG, "Closed connection from %s", host);
-                close(t_ret->new_socket_fd);  
+                close(tmp_ret->new_socket_fd);  
             
                 //free thread data and thread struct
-                free(t_ret);
+                free(tmp_ret);
                 free(tp);
             }
             
@@ -551,7 +565,7 @@ int main(int argc, char *argv[])
     }
 
     //free linked list
-    thread_data_t* t;
+    void* t;
     while(!SLIST_EMPTY(&head)) {
         slist_thread_t* threadp = SLIST_FIRST(&head);
         SLIST_REMOVE_HEAD(&head, entries);
