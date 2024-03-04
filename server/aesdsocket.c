@@ -36,7 +36,7 @@ char host[NI_MAXHOST];     // for getting connection logs
 typedef struct {
     pthread_mutex_t* th_mutex;
     int new_socket_fd; 
-    FILE * log_file_fd;
+    int log_file_fd;
     int complete_flag; // 0-not complete; 1-success; -1-failure
 }thread_data_t;
 
@@ -81,26 +81,51 @@ static void timer_handler( int sn ) {
  * @return    ret    - success(0) or failure(-1) 
  *
  *****************************************************************************/
-static int send_data_to_client(int socket, FILE * fd) {
+static int send_data_to_client(int socket, int fd) {
     
     int ret = 0;
-    int  bytes_read;
-    char *packet_ptr;
-    size_t sent_cnt;
+    ssize_t  bytes_read;
+    off_t file_offset = 0;
+    char eof_char = 0;
+    ssize_t sent_cnt;
     char read_buffer[MAX_BUFFER_SIZE];
     memset(read_buffer, 0, MAX_BUFFER_SIZE);
-    while (!feof(fd))
-    {
-        bytes_read = fread(read_buffer, 1, MAX_BUFFER_SIZE, fd);
-        packet_ptr = read_buffer;
-        sent_cnt = send(socket, packet_ptr, bytes_read, 0);
-        if (sent_cnt == -1) {
-            syslog(LOG_ERR, "Unable to send data to client\n");
+
+    while(1) {
+
+        bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        syslog(LOG_INFO, "Read %lu bytes from file\n", bytes_read);
+        if(bytes_read == -1) {
+            syslog(LOG_ERR, "Error reading file in send data");
             ret = -1;
             break;
         }
+        //end of file
+        if(bytes_read == 0) { 
+            // if no file data, sending \n 
+            if(eof_char != '\n') {
+                sent_cnt = send(socket, "\n", 1, 0);
+                if(sent_cnt == -1) { 
+                    syslog(LOG_ERR, "Error sending data to socket");
+                }
+            }
+            ret = 0;
+            break;
+        }
+        // valid data to send via socket
+        sent_cnt = send(socket, read_buffer, bytes_read, 0);
+        if(sent_cnt == -1) {
+            syslog(LOG_ERR, "Error sending data to socket");
+            ret = -1;
+            break;
+        }
+
+        eof_char = read_buffer[bytes_read-1];
+        // set offset for new read
+        file_offset += bytes_read;
+
         memset(read_buffer, 0, MAX_BUFFER_SIZE);
-        syslog(LOG_INFO, "Sent %lu bytes to client\n", sent_cnt);
+        syslog(LOG_INFO, "Sent %lu bytes to client\n", sent_cnt);    
     }
 
     return ret;
@@ -116,10 +141,11 @@ static int send_data_to_client(int socket, FILE * fd) {
  * @return    ret    - success(0) or failure(-1) 
  *
  *****************************************************************************/
-static int read_packet(int socket, FILE * fd, pthread_mutex_t *m) {
+static int read_packet(int socket, int fd, pthread_mutex_t *m) {
     
-    int result = 0;
+    int result = 1;
     int continue_read = 1;
+    ssize_t ret; 
 
     char read_buffer[MAX_BUFFER_SIZE];
     memset(read_buffer, 0, MAX_BUFFER_SIZE);
@@ -144,7 +170,7 @@ static int read_packet(int socket, FILE * fd, pthread_mutex_t *m) {
             syslog(LOG_ERR, "Error reading data from socket\n");
         } else  if(byte_read == 0) {  
             continue_read = 0;
-            result = -1;
+            result = 0;
         } else {
             syslog(LOG_ERR, "Received %lu bytes from client\n", byte_read);
 
@@ -173,19 +199,24 @@ static int read_packet(int socket, FILE * fd, pthread_mutex_t *m) {
 
     // write data to file /var/tmp/aesdsocketdata
     // acquire lock
-    if(pthread_mutex_lock(m) == 0) {
-        fwrite(buff, byte_read, 1, fd);
-        pthread_mutex_unlock(m);
-
-        // perform cleanup
-        free(buff);
-        memset(read_buffer, 0, MAX_BUFFER_SIZE);
-
-        syslog(LOG_INFO, "Data written to file\n");
-    } else {
-        syslog(LOG_ERR, "Failure acquiring lock for file write\n");
-        result = -1;
+    if(result != -1) {
+        if(pthread_mutex_lock(m) == 0) {
+            ret = write(fd, buff, byte_read);
+            pthread_mutex_unlock(m);
+            if(ret == -1) {
+                syslog(LOG_ERR, "Failure writing to file");
+            } else {
+                syslog(LOG_INFO, "Data written to file : %lu bytes\n", byte_read);
+            }
+        } else {
+            syslog(LOG_ERR, "Failure acquiring lock for file write\n");
+            result = -1;
+        }
     }
+
+    // perform cleanup
+    free(buff);
+    memset(read_buffer, 0, MAX_BUFFER_SIZE);
     return result;
 }
 
@@ -325,7 +356,7 @@ static void* socket_thread(void* t_para) {
     thread_data_t* t_data = (thread_data_t*) t_para;
     
     // continuously read
-    while(1) {
+    while(1) {  
         //read full packet
         ret = read_packet(t_data->new_socket_fd, t_data->log_file_fd, \
                           t_data->th_mutex);
@@ -340,6 +371,7 @@ static void* socket_thread(void* t_para) {
         }
 
         // retransmit the file
+        syslog(LOG_INFO, "Sending data to client\n");
         ret = send_data_to_client(t_data->new_socket_fd, t_data->log_file_fd);
         if(ret == -1) {
             syslog(LOG_INFO, "Error sending data to client\n");
@@ -452,11 +484,13 @@ int main(int argc, char *argv[])
 
     // accept 
     int new_socket_fd;
-    FILE *fd;
+    int fd;
 
     // create /var/tmp/aesdsocketdata in append mode
-    fd = fopen(OUTPUT_FILE_PATH, "a+");
-
+    fd = open(OUTPUT_FILE_PATH, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR |
+                                                             S_IRGRP | S_IWGRP | 
+                                                             S_IROTH | S_IWOTH);
+    
     while(socket_stat && !signal_caught) {
         new_socket_fd = socket_accept(socket_fd);
         if(new_socket_fd != -1) {
@@ -521,7 +555,7 @@ int main(int argc, char *argv[])
             }
 
             //write timestamp to file
-            fwrite(data, strlen(data), 1, fd);
+            write(fd, data, strlen(data));
             ret = pthread_mutex_unlock(&mutex);
         }
 
@@ -562,6 +596,7 @@ int main(int argc, char *argv[])
         close(new_socket_fd);           // close accepted socket
         close(socket_fd);               // close socket
         remove(OUTPUT_FILE_PATH);       // remove log file
+        close(fd);
     }
 
     //free linked list
