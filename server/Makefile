@@ -1,6 +1,5 @@
 #Compiler
-CROSS_COMPILE =
-CC = gcc
+CC ?= $(CROSS_COMPILE)gcc
 
 #Enabling compiler warnings and debug info
 CFLAGS = -g -Wall -Werror -pthread
@@ -14,7 +13,7 @@ default:${Target}
 #all
 all:${Target}
 ${Target}:${Target}.c
-	${CROSS_COMPILE}${CC} ${CFLAGS} -o ${Target} ${Target}.c -lrt 
+	${CC} ${CFLAGS} -o ${Target} ${Target}.c -lrt 
 clean:
 	${RM} ${Target} *.o
 
