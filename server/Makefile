@@ -3,7 +3,7 @@ CROSS_COMPILE =
 CC = gcc
 
 #Enabling compiler warnings and debug info
-CFLAGS = -Wall -Werror -pthread
+CFLAGS = -g -Wall -Werror -pthread
 
 #Target
 Target = aesdsocket
