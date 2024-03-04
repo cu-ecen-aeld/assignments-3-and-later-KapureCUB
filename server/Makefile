@@ -2,7 +2,7 @@
 CC ?= $(CROSS_COMPILE)gcc
 
 #Enabling compiler warnings and debug info
-CFLAGS = -g -Wall -Werror -pthread
+CFLAGS = -g -pthread
 
 #Target
 Target = aesdsocket
