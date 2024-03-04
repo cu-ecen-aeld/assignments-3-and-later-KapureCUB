@@ -13,7 +13,7 @@ default:${Target}
 #all
 all:${Target}
 ${Target}:${Target}.c
-	${CC} ${CFLAGS} -o ${Target} ${Target}.c -lrt 
+	 ${CC} ${CFLAGS} $(LDFLAGS) -o ${Target} ${Target}.c -lrt 
 clean:
 	${RM} ${Target} *.o
 
