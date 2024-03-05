@@ -1,9 +1,8 @@
 #Compiler
-CROSS_COMPILE =
-CC = gcc
+CC ?= $(CROSS_COMPILE)gcc
 
 #Enabling compiler warnings and debug info
-CFLAGS = -Wall -Werror
+CFLAGS = -g -pthread
 
 #Target
 Target = aesdsocket
@@ -14,7 +13,7 @@ default:${Target}
 #all
 all:${Target}
 ${Target}:${Target}.c
-	${CROSS_COMPILE}${CC} ${CFLAGS} -o ${Target} ${Target}.c
+	 ${CC} ${CFLAGS} $(LDFLAGS) -o ${Target} ${Target}.c -lrt 
 clean:
 	${RM} ${Target} *.o
 
