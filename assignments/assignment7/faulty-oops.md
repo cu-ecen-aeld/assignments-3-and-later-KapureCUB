@@ -47,12 +47,13 @@ Code: d2800001 d2800000 d503233f d50323bf (b900003f)
 _The above error was due to a **null pointer dereference** which resulted in a kernel oops, eventually leading to rebooting the kernel_
 
 ## Analysing the generation of error
-The error was generated in response to an echo command shown below.
-```echo “hello_world” > /dev/faulty```
-Prior to running this, the system had already loaded the faulty.ko module and had created the faulty node in /dev.
-The ```echo``` command invokes a write operation of the faulty kernel module.
-After investigating the faulty.c file_ops, the faulty_write method contains an inherent bug which does a null pointer dereference as shown below on line 3.
-```1. ssize_t faulty_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos) {
+- The error was generated in response to an echo command shown below.
+- ```echo “hello_world” > /dev/faulty```
+- Prior to running this, the system had already loaded the faulty.ko module and had created the faulty node in /dev.
+- The ```echo``` command invokes a write operation of the faulty kernel module.
+- After investigating the faulty.c file_ops, the faulty_write method contains an inherent bug which does a null pointer dereference as shown below on line 3.
+```
+   1. ssize_t faulty_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos) {
    2.   /* make a simple fault by dereferencing a NULL pointer */
    3.   *(int *)0 = 0;
    4.   return 0;
@@ -60,16 +61,16 @@ After investigating the faulty.c file_ops, the faulty_write method contains an i
 ```  
 
 ## Analysing the effect
-The invocation of the error caused a kernel oops. 
-At this stage the kernel terminates all the user-space processes, unmounts the file system and starts to obtain debug information about the error.
-This is what is displayed on the terminal regarding the error.
-If the kernel is unable to recover, the system is rebooted, which did happen in out case.
+- The invocation of the error caused a kernel oops. 
+- At this stage the kernel terminates all the user-space processes, unmounts the file system and starts to obtain debug information about the error.
+- This is what is displayed on the terminal regarding the error.
+- If the kernel is unable to recover, the system is rebooted, which did happen in out case.
 
 ## Analysing the debug message
-The debug log of the oops shows the cause of panic and the kernel state as well as the userspace process state.
-The memory fault registers and their state is displayed in the **Mem abort info** and  **Data abort info** section.
-A brief about the userspace process memory state that caused the error is also shown in the **user pgtable** section. The page size, virtual address fields used are shown.
-Also, what modules were loaded duuring the occurance of this panic is also provided in **Modules linked in**.
-Finally, a detailed call trace showing what values were present at the process stack (program counter(pc), link register (lr), stack pointer (sp)) also showning **faulty_write+0x14/0x20 [faulty]** was the location of the last function call when the error happened justifies the resoning of the null pointer dereference.
+- The debug log of the oops shows the cause of panic and the kernel state as well as the userspace process state.
+- The memory fault registers and their state is displayed in the **Mem abort info** and  **Data abort info** section.
+- A brief about the userspace process memory state that caused the error is also shown in the **user pgtable** section. The page size, virtual address fields used are shown.
+- Also, what modules were loaded duuring the occurance of this panic is also provided in **Modules linked in**.
+- Finally, a detailed call trace showing what values were present at the process stack (program counter(pc), link register (lr), stack pointer (sp)) also showning **faulty_write+0x14/0x20 [faulty]** was the location of the last function call when the error happened justifies the resoning of the null pointer dereference.
 
 
