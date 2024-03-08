@@ -65,7 +65,7 @@ _The above error was due to a **null pointer dereference** which resulted in a k
 - The invocation of the error caused a _kernel oops_. 
 - At this stage the kernel terminates all the user-space processes, unmounts the file system and starts to obtain debug information about the error.
 - This is what is displayed on the terminal regarding the error.
-- If the kernel is unable to recover, the system is _rebooted_, which did happen in out case.
+- If the kernel is unable to recover, the system is _rebooted_, which did happen in our case.
 
 ## Analysing the debug message
 - The debug log of the oops shows the cause of panic and the kernel state as well as the userspace process state.
