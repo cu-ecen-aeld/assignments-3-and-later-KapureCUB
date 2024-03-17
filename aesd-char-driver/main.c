@@ -226,23 +226,14 @@ void aesd_cleanup_module(void)
     /**
      * TODO: cleanup AESD specific poritions here as necessary
      */
-    // free allocated buffer entries
+    aesd_device.w_entry.buffptr = NULL;
+    struct aesd_buffer_entry *entry = NULL;
 
-    // free aesd_device
-    if(aesd_device.buffer.full) {
-        for(idx=0; idx<AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; idx++) {
-            kfree(&aesd_device.buffer.entry[idx].buffptr);
-            kfree(&aesd_device.buffer.entry[idx]);
-        }
-    } else {
-        for(idx=0; idx<(aesd_device.buffer.in_offs-1); idx++) {
-            kfree(&aesd_device.buffer.entry[idx].buffptr);
-            kfree(&aesd_device.buffer.entry[idx]);
-        }
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, &aesd_device.buffer, idx)
+    {
+       kfree(entry->buffptr);
     }
-    // check buffptr if not null
-    if(aesd_device.w_entry.buffptr != NULL)
-        kfree(&aesd_device.w_entry.buffptr);
+    mutex_destroy(&aesd_device.lock);
     unregister_chrdev_region(devno, 1);
 }
 
