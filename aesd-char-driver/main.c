@@ -95,7 +95,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
                 loff_t *f_pos)
 {
     ssize_t retval = -ENOMEM;
-    struct aesd_buffer_entry *ret_entry;
+    char *ret_entry = NULL;
     struct aesd_dev *dev = filp->private_data;
     char *write_buf;
 
@@ -145,7 +145,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
         // free overwritten buffer entries
         if(ret_entry != NULL)
-            kfree(&ret_entry->buffptr);
+            kfree(ret_entry);
 
         // clear working buffer
         dev->w_entry.buffptr = NULL;
