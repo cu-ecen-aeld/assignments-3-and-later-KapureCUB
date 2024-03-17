@@ -95,7 +95,7 @@ struct aesd_buffer_entry *aesd_circular_buffer_add_entry(struct aesd_circular_bu
 
             // return case
             if(buffer->full) {
-                ret_ptr = &buffer->entry[local_in_offs];
+                ret_ptr = &(buffer->entry[local_in_offs]);
             }
             // adding element to buffer
             buffer->entry[local_in_offs] = *add_entry;

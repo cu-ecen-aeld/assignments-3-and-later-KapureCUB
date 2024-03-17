@@ -145,7 +145,7 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
 
         // free overwritten buffer entries
         if(ret_entry != NULL)
-            kfree(ret_entry);
+            kfree(&ret_entry->buffptr);
 
         // clear working buffer
         dev->w_entry.buffptr = NULL;
