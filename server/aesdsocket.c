@@ -22,9 +22,15 @@
 
 #define PORT                "9000"
 #define BACKLOGS            5
-#define OUTPUT_FILE_PATH    "/var/tmp/aesdsocketdata"
 #define MAX_BUFFER_SIZE     256
 
+#define USE_AESD_CHAR_DEVICE 1
+
+#ifdef USE_AESD_CHAR_DEVICE
+    #define OUTPUT_FILE_PATH    "/dev/aesdchar"
+#else
+    #define OUTPUT_FILE_PATH    "/var/tmp/aesdsocketdata"
+#endif
 
 int socket_fd;
 int signal_caught = 0;
@@ -534,30 +540,32 @@ int main(int argc, char *argv[])
             SLIST_INSERT_HEAD(&head, t_ptr, entries);
         }
 
-        // timer service routine
-        if(signal_timer) {
-            signal_timer = 0; 
-            
-            //get now
-            time(&rawNow);
-            now = localtime_r(&rawNow, now);
-            
-            //format timestamp
-            memset(&data, 0, sizeof(data));
-            strftime(data, sizeof(data), "timestamp: %Y, %m, %d, %H, %M, %S\n", now);
+        #ifndef USE_AESD_CHAR_DEVICE
+            // timer service routine
+            if(signal_timer) {
+                signal_timer = 0; 
+                
+                //get now
+                time(&rawNow);
+                now = localtime_r(&rawNow, now);
+                
+                //format timestamp
+                memset(&data, 0, sizeof(data));
+                strftime(data, sizeof(data), "timestamp: %Y, %m, %d, %H, %M, %S\n", now);
 
-            ret = pthread_mutex_lock(&mutex);
-            if(ret != 0) {
-                syslog(LOG_ERR, "Failed to lock timestamp");
-                socket_stat = 0;
+                ret = pthread_mutex_lock(&mutex);
+                if(ret != 0) {
+                    syslog(LOG_ERR, "Failed to lock timestamp");
+                    socket_stat = 0;
+                    ret = pthread_mutex_unlock(&mutex);
+                    continue;
+                }
+
+                //write timestamp to file
+                write(fd, data, strlen(data));
                 ret = pthread_mutex_unlock(&mutex);
-                continue;
             }
-
-            //write timestamp to file
-            write(fd, data, strlen(data));
-            ret = pthread_mutex_unlock(&mutex);
-        }
+        #endif
 
         // check for thread status and close if complete
         slist_thread_t* tp = NULL;
@@ -595,7 +603,9 @@ int main(int argc, char *argv[])
     if(socket_stat) {
         close(new_socket_fd);           // close accepted socket
         close(socket_fd);               // close socket
-        remove(OUTPUT_FILE_PATH);       // remove log file
+        #ifndef USE_AESD_CHAR_DEVICE
+            remove(OUTPUT_FILE_PATH);       // remove log file
+        #endif
         close(fd);
     }
 

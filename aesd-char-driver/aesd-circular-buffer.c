@@ -15,7 +15,7 @@
 #endif
 
 #include "aesd-circular-buffer.h"
-#include <stdio.h>    // added for printf
+//#include <stdio.h>    // added for printf
 /**
  * @param buffer the buffer to search for corresponding offset.  Any necessary locking must be performed by caller.
  * @param char_offset the position to search for in the buffer list, describing the zero referenced
@@ -65,11 +65,11 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
             }
         } else {
             // invalid add_entry parameter. Report error
-            printf("Invalid buffer pointer passed to fops\n");
+            //printf("Invalid buffer pointer passed to fops\n");
         }    
     } else {
         // invalid buffer parameter. Report error
-        printf("Invalid entry_offset_byte_rtn pointer passed to fops\n");
+        //printf("Invalid entry_offset_byte_rtn pointer passed to fops\n");
     }
 
     return ret;
@@ -82,8 +82,10 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
 * Any necessary locking must be handled by the caller
 * Any memory referenced in @param add_entry must be allocated by and/or must have a lifetime managed by the caller.
 */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
+const char *aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const struct aesd_buffer_entry *add_entry)
 {
+    const char *ret_ptr = NULL;
+    
     // check for args validity
     if(buffer != NULL) {
         if(add_entry != NULL) {
@@ -91,6 +93,10 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
             uint8_t local_in_offs   = buffer->in_offs;
             uint8_t local_out_offs  = buffer->out_offs;
 
+            // return case
+            if(buffer->full) {
+                ret_ptr = buffer->entry[local_in_offs].buffptr;
+            }
             // adding element to buffer
             buffer->entry[local_in_offs] = *add_entry;
             // setting input and output buffer offsets
@@ -109,13 +115,14 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer, const s
             }
         } else {
             // invalid add_entry parameter. Report error
-            printf("Invalid buffer pointer passed to add_entry\n");
+            //printf("Invalid buffer pointer passed to add_entry\n");
         }    
     } else {
         // invalid buffer parameter. Report error
-        printf("Invalid entry pointer passed to add_entry\n");
+        //printf("Invalid entry pointer passed to add_entry\n");
     }
     
+    return ret_ptr;
 }
 
 /**
