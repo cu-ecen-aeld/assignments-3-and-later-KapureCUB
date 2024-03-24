@@ -20,11 +20,18 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#define PORT                "9000"
-#define BACKLOGS            5
-#define MAX_BUFFER_SIZE     256
+// additions for assignment 9
+#include <sys/ioctl.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
 
-#define USE_AESD_CHAR_DEVICE 1
+#define PORT                     "9000"
+#define BACKLOGS                 5
+#define MAX_BUFFER_SIZE          256
+#define IOCTL_CMD_STR            "AESDCHAR_IOCSEEKTO:"
+#define IOCTL_STR_CMD_LEN        (sizeof(IOCTL_CMD_STR) - 1)      // escape /n
+#define MINIMUM_IOCTL_CMD_LEN    22
+
+#define USE_AESD_CHAR_DEVICE     1
 
 #ifdef USE_AESD_CHAR_DEVICE
     #define OUTPUT_FILE_PATH    "/dev/aesdchar"
@@ -149,13 +156,16 @@ static int send_data_to_client(int socket, int fd) {
  *****************************************************************************/
 static int read_packet(int socket, int fd, pthread_mutex_t *m) {
     
-    int result = 1;
+    int result        = 1;
     int continue_read = 1;
+    int ioctl_found   = 1;
     ssize_t ret; 
 
     char read_buffer[MAX_BUFFER_SIZE];
     memset(read_buffer, 0, MAX_BUFFER_SIZE);
     ssize_t byte_read, total_byte_read = 0;
+
+    struct aesd_seekto seekto;
 
     char *buff = malloc(1);
     if(!buff) {
@@ -202,6 +212,26 @@ static int read_packet(int socket, int fd, pthread_mutex_t *m) {
             continue_read = (nl_char == NULL) ? 1:0; 
         }
     }
+
+    #ifdef USE_AESD_CHAR_DEVICE
+        // Check to see if we've gotten the ioctl command and the other arguments
+        ioctl_found = strncmp(buff, IOCTL_CMD_STR, IOCTL_STR_CMD_LEN);
+        if(ioctl_cmd_found == 0) {
+            if(byte_read >= MINIMUM_IOCTL_CMD_LEN) {
+                syslog(LOG_INFO, "IOCTL command received");
+                
+                // call the ioctl method and skip writting to file
+                seekto.write_cmd        = (uint32_t)atoi(&buff[IOCTL_STR_CMD_LEN]);
+                seekto.write_cmd_offset = (uint32_t)atoi(&buff[MINIMUM_IOCTL_CMD_LEN - 1]);
+                syslog(LOG_INFO, "Write cmd %u and write cmd offset %u", seekto.write_cmd, seekto.write_cmd_offset);
+                ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto);
+
+                // dont write to file
+                result = -1;
+            }
+        }
+    #endif
+
 
     // write data to file /var/tmp/aesdsocketdata
     // acquire lock
