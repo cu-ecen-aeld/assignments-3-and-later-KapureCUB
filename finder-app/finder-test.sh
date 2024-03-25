@@ -2,19 +2,17 @@
 # Tester script for assignment 1 and assignment 2
 # Author: Siddhant Jajoo
 
-# clean any previous build artifacts
-make clean
-
-# build native compilation
-make 
-
 set -e
 set -u
 
 NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
-username=$(cat conf/username.txt)
+# changing the path to match target location for assignment 4
+username=$(cat /etc/finder-app/conf/username.txt)
+
+# change to PWD before executing.
+cd `dirname $0`
 
 if [ $# -lt 3 ]
 then
@@ -38,7 +36,8 @@ echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
 rm -rf "${WRITEDIR}"
 
 # create $WRITEDIR if not assignment1
-assignment=`cat ../conf/assignment.txt`
+# changing the path to match target location for assginment 4
+assignment=`cat /etc/finder-app/conf/assignment.txt`
 
 if [ $assignment != 'assignment1' ]
 then
@@ -65,6 +64,9 @@ do
 done
 
 OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
+
+# pushing the output of finder to .txt for assignment 4
+echo ${OUTPUTSTRING} > /tmp/assignment4-result.txt
 
 # remove temporary directories
 rm -rf /tmp/aeld-data
