@@ -44,6 +44,7 @@ int signal_caught = 0;
 int signal_timer  = 0;
 char host[NI_MAXHOST];     // for getting connection logs
 
+int ioctl_found = 1;
 
 /*************************** Thread data structure ****************************/ 
 typedef struct {
@@ -106,7 +107,11 @@ static int send_data_to_client(int socket, int fd) {
 
     while(1) {
 
-        bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        if(ioctl_found == 0)
+            bytes_read = read(fd, read_buffer, MAX_BUFFER_SIZE);
+        else 
+            bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+
         syslog(LOG_INFO, "Read %lu bytes from file\n", bytes_read);
         if(bytes_read == -1) {
             syslog(LOG_ERR, "Error reading file in send data");
@@ -158,7 +163,7 @@ static int read_packet(int socket, int fd, pthread_mutex_t *m) {
     
     int result        = 1;
     int continue_read = 1;
-    int ioctl_found   = 1;
+    //int ioctl_found   = 1;
     ssize_t ret; 
 
     char read_buffer[MAX_BUFFER_SIZE];
@@ -216,7 +221,7 @@ static int read_packet(int socket, int fd, pthread_mutex_t *m) {
     #ifdef USE_AESD_CHAR_DEVICE
         // Check to see if we've gotten the ioctl command and the other arguments
         ioctl_found = strncmp(buff, IOCTL_CMD_STR, IOCTL_STR_CMD_LEN);
-        if(ioctl_cmd_found == 0) {
+        if(ioctl_found == 0) {
             if(byte_read >= MINIMUM_IOCTL_CMD_LEN) {
                 syslog(LOG_INFO, "IOCTL command received");
                 
@@ -225,17 +230,14 @@ static int read_packet(int socket, int fd, pthread_mutex_t *m) {
                 seekto.write_cmd_offset = (uint32_t)atoi(&buff[MINIMUM_IOCTL_CMD_LEN - 1]);
                 syslog(LOG_INFO, "Write cmd %u and write cmd offset %u", seekto.write_cmd, seekto.write_cmd_offset);
                 ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto);
-
-                // dont write to file
-                result = -1;
             }
         }
     #endif
 
 
-    // write data to file /var/tmp/aesdsocketdata
+    // write data to file /var/tmp/aesdsocketdata and check if ioclt command not found
     // acquire lock
-    if(result != -1) {
+    if((result != -1) && (ioctl_found != 0)) {
         if(pthread_mutex_lock(m) == 0) {
             ret = write(fd, buff, byte_read);
             pthread_mutex_unlock(m);
