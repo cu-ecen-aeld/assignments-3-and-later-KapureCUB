@@ -414,6 +414,8 @@ static void* socket_thread(void* t_para) {
         if(ret == -1) {
             syslog(LOG_INFO, "Error sending data to client\n");
         }
+        // reset the ioctl flag
+        ioctl_found = 1;
     }
 
     // complete flag
