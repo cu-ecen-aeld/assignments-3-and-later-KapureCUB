@@ -437,7 +437,7 @@ int main(int argc, char *argv[])
         if (strcmp(argv[1], "-d") == 0) {
             // argument for running as daemon process
             daemon_enable = true;
-            syslog(LOG_INFO, "Running aesdsocket as a daemon");
+            syslog(LOG_INFO, "Running aesdsocket as a daemon for assignment 9");
         }    
     } else if(argc == 1) {
         // argument for running as a normal process
