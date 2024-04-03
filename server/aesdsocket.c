@@ -107,11 +107,11 @@ static int send_data_to_client(int socket, int fd) {
 
     while(1) {
 
-        if(ioctl_found == 0)
-            bytes_read = read(fd, read_buffer, MAX_BUFFER_SIZE);
-        else 
-            bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
-
+        // if(ioctl_found == 0)
+        //     bytes_read = read(fd, read_buffer, MAX_BUFFER_SIZE);
+        // else 
+        //     bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
         syslog(LOG_INFO, "Read %lu bytes from file\n", bytes_read);
         if(bytes_read == -1) {
             syslog(LOG_ERR, "Error reading file in send data");
