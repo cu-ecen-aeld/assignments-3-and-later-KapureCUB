@@ -1,4 +1,12 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <string.h>
+
 
 /**
  * @param cmd the command to execute with system()
@@ -16,6 +24,12 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+    int ret;
+    ret = system(cmd);
+    if(ret == -1) {
+        printf("Error in executing system() for command %s. Errno - %d", cmd, errno);
+        return false; 
+    }
 
     return true;
 }
@@ -58,10 +72,32 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t pid;
+    pid = fork();
 
-    va_end(args);
-
-    return true;
+    if (pid == -1) {
+        perror("Error executing fork");
+        va_end(args);
+        return false;
+    } else if (pid == 0) {
+        // Child process.Calling execv
+        execv(command[0], command);
+        // If execv fails
+	perror("Error executing execv"); 
+	exit(EXIT_FAILURE);
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+        // check status of waitpid
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            va_end(args);
+            return true;
+        } else {
+            va_end(args);
+            return false;
+        }
+    }
 }
 
 /**
@@ -92,8 +128,47 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    pid_t pid;
+    
+    // creating a child process
+    pid = fork();
 
-    va_end(args);
+    if (pid == -1) {
+	//print error using perror
+        perror("Error executing fork");
+        va_end(args);
+        return false;
 
-    return true;
+    } else if (pid == 0) {
+        // Child process
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd == -1) {
+	    // print error using perror
+            perror("Error opening output file");
+            exit(EXIT_FAILURE);
+        }
+	// redirect stdout to outputfile
+        dup2(fd, STDOUT_FILENO);
+        // closing file
+	close(fd);
+	
+	// call execv
+        execv(command[0], command);
+	// If execv fails
+        perror("Error executing execv");  
+        exit(EXIT_FAILURE);
+
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+	// check for status 
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            va_end(args);
+            return true;
+        } else {
+            va_end(args);
+            return false;
+        }
+    }
 }

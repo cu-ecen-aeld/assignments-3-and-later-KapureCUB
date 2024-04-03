@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Finder Script
 # This script is used for searching a string pattern in all the files provided by the filesdir argument
 # Also searches in the subdirectory files for the existence of given substring
@@ -12,12 +12,12 @@ FILECNT=0
 GTG=0
 
 # help log function
-function help_log {
-        echo -e "\nUSAGE: ./finder.sh filesdir searchstr"
-        echo "    filesdir  - path to search for string"
-        echo "    searchstr - string to search for"
+help_log() {
+        printf "\nUSAGE: ./finder.sh filesdir searchstr\n"
+        printf "    filesdir  - path to search for string\n"
+        printf "    searchstr - string to search for\n"
 
-        echo -e "\nExample usage: ./finder.sh /home/work/dir foo"
+        printf "\nExample usage: ./finder.sh /home/work/dir foo\n"
 }
 
 # check if the arguments are correct
@@ -32,17 +32,17 @@ then
                     STRING=$2
                     GTG=1
                 else
-                    echo "Error 1: filesdir does not represent a directory on the file system"
+                    printf "Error 1: filesdir does not represent a directory on the file system"
 		    help_log
                     exit 1
                 fi
 	else
-            echo "Error 1: searchstr parameter not specified"
+            printf "Error 1: searchstr parameter not specified"
 	    help_log
             exit 1
         fi
 else
-	echo "Error 1: filesdir parameter not specified."
+	printf "Error 1: filesdir parameter not specified."
         help_log
 	exit 1
 fi
@@ -54,11 +54,8 @@ then
     # preserving the file name using -print0 
     # also using process substitution instead of pipeline (|) to 
     # preserve the FILECNT and MATCHCNT
-    while IFS= read -r -d $'\0' FILE
-    do
-        FILECNT=$((FILECNT+1))
-        cmd=$(grep -c "${STRING}" "${FILE}")
-        MATCHCNT=$((MATCHCNT+cmd))
-    done < <(find "${DIR}" -type f -print0) 
-    echo "The number of files are $FILECNT and the number of matching lines are $MATCHCNT"
+    cd $DIR
+    FILECNT=$(ls -1 $DIR | wc -l)
+    MATCHCNT=$(grep -r $STRING $DIR | wc -l)
+    printf "The number of files are $FILECNT and the number of matching lines are $MATCHCNT\n"
 fi
