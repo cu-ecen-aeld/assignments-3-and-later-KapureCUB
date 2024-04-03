@@ -107,11 +107,11 @@ static int send_data_to_client(int socket, int fd) {
 
     while(1) {
 
-        // if(ioctl_found == 0)
-        //     bytes_read = read(fd, read_buffer, MAX_BUFFER_SIZE);
-        // else 
-        //     bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
-        bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        if(ioctl_found == 0)
+            bytes_read = read(fd, read_buffer, MAX_BUFFER_SIZE);
+        else 
+            bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        //bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
         syslog(LOG_INFO, "Read %lu bytes from file\n", bytes_read);
         if(bytes_read == -1) {
             syslog(LOG_ERR, "Error reading file in send data");
@@ -527,14 +527,20 @@ int main(int argc, char *argv[])
     int fd;
 
     // create /var/tmp/aesdsocketdata in append mode
-    fd = open(OUTPUT_FILE_PATH, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR |
-                                                             S_IRGRP | S_IWGRP | 
-                                                             S_IROTH | S_IWOTH);
+    if(USE_AESD_CHAR_DEVICE==0) {
+        fd = open(OUTPUT_FILE_PATH, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR |
+                                                                 S_IRGRP | S_IWGRP | 
+                                                                 S_IROTH | S_IWOTH);
+    }
     
     while(socket_stat && !signal_caught) {
         new_socket_fd = socket_accept(socket_fd);
         if(new_socket_fd != -1) {
-        
+            
+            // open file
+            if(USE_AESD_CHAR_DEVICE==1) {
+                fd = open(OUTPUT_FILE_PATH, O_RDWR);
+            }
             // thread creation process
             pthread_t thread;
             thread_data_t* t_data = malloc(sizeof(thread_data_t));
