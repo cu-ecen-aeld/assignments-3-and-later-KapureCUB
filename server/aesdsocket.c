@@ -20,11 +20,18 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#define PORT                "9000"
-#define BACKLOGS            5
-#define MAX_BUFFER_SIZE     256
+// additions for assignment 9
+#include <sys/ioctl.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
 
-#define USE_AESD_CHAR_DEVICE 1
+#define PORT                     "9000"
+#define BACKLOGS                 5
+#define MAX_BUFFER_SIZE          256
+#define IOCTL_CMD_STR            "AESDCHAR_IOCSEEKTO:"
+#define IOCTL_STR_CMD_LEN        (sizeof(IOCTL_CMD_STR) - 1)      // escape /n
+#define MINIMUM_IOCTL_CMD_LEN    22
+
+#define USE_AESD_CHAR_DEVICE     1
 
 #ifdef USE_AESD_CHAR_DEVICE
     #define OUTPUT_FILE_PATH    "/dev/aesdchar"
@@ -37,6 +44,7 @@ int signal_caught = 0;
 int signal_timer  = 0;
 char host[NI_MAXHOST];     // for getting connection logs
 
+int ioctl_found = 1;
 
 /*************************** Thread data structure ****************************/ 
 typedef struct {
@@ -99,7 +107,11 @@ static int send_data_to_client(int socket, int fd) {
 
     while(1) {
 
-        bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        if(ioctl_found == 0)
+            bytes_read = read(fd, read_buffer, MAX_BUFFER_SIZE);
+        else 
+            bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
+        //bytes_read = pread(fd, read_buffer, MAX_BUFFER_SIZE, file_offset);
         syslog(LOG_INFO, "Read %lu bytes from file\n", bytes_read);
         if(bytes_read == -1) {
             syslog(LOG_ERR, "Error reading file in send data");
@@ -149,13 +161,16 @@ static int send_data_to_client(int socket, int fd) {
  *****************************************************************************/
 static int read_packet(int socket, int fd, pthread_mutex_t *m) {
     
-    int result = 1;
+    int result        = 1;
     int continue_read = 1;
+    //int ioctl_found   = 1;
     ssize_t ret; 
 
     char read_buffer[MAX_BUFFER_SIZE];
     memset(read_buffer, 0, MAX_BUFFER_SIZE);
     ssize_t byte_read, total_byte_read = 0;
+
+    struct aesd_seekto seekto;
 
     char *buff = malloc(1);
     if(!buff) {
@@ -203,9 +218,26 @@ static int read_packet(int socket, int fd, pthread_mutex_t *m) {
         }
     }
 
-    // write data to file /var/tmp/aesdsocketdata
+    #ifdef USE_AESD_CHAR_DEVICE
+        // Check to see if we've gotten the ioctl command and the other arguments
+        ioctl_found = strncmp(buff, IOCTL_CMD_STR, IOCTL_STR_CMD_LEN);
+        if(ioctl_found == 0) {
+            if(byte_read >= MINIMUM_IOCTL_CMD_LEN) {
+                syslog(LOG_INFO, "IOCTL command received");
+                
+                // call the ioctl method and skip writting to file
+                seekto.write_cmd        = (uint32_t)atoi(&buff[IOCTL_STR_CMD_LEN]);
+                seekto.write_cmd_offset = (uint32_t)atoi(&buff[MINIMUM_IOCTL_CMD_LEN - 1]);
+                syslog(LOG_INFO, "Write cmd %u and write cmd offset %u", seekto.write_cmd, seekto.write_cmd_offset);
+                ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto);
+            }
+        }
+    #endif
+
+
+    // write data to file /var/tmp/aesdsocketdata and check if ioclt command not found
     // acquire lock
-    if(result != -1) {
+    if((result != -1) && (ioctl_found != 0)) {
         if(pthread_mutex_lock(m) == 0) {
             ret = write(fd, buff, byte_read);
             pthread_mutex_unlock(m);
@@ -382,6 +414,8 @@ static void* socket_thread(void* t_para) {
         if(ret == -1) {
             syslog(LOG_INFO, "Error sending data to client\n");
         }
+        // reset the ioctl flag
+        ioctl_found = 1;
     }
 
     // complete flag
@@ -403,7 +437,7 @@ int main(int argc, char *argv[])
         if (strcmp(argv[1], "-d") == 0) {
             // argument for running as daemon process
             daemon_enable = true;
-            syslog(LOG_INFO, "Running aesdsocket as a daemon");
+            syslog(LOG_INFO, "Running aesdsocket as a daemon for assignment 9");
         }    
     } else if(argc == 1) {
         // argument for running as a normal process
@@ -493,14 +527,20 @@ int main(int argc, char *argv[])
     int fd;
 
     // create /var/tmp/aesdsocketdata in append mode
-    fd = open(OUTPUT_FILE_PATH, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR |
-                                                             S_IRGRP | S_IWGRP | 
-                                                             S_IROTH | S_IWOTH);
+    if(USE_AESD_CHAR_DEVICE==0) {
+        fd = open(OUTPUT_FILE_PATH, O_CREAT | O_RDWR | O_APPEND, S_IRUSR | S_IWUSR |
+                                                                 S_IRGRP | S_IWGRP | 
+                                                                 S_IROTH | S_IWOTH);
+    }
     
     while(socket_stat && !signal_caught) {
         new_socket_fd = socket_accept(socket_fd);
         if(new_socket_fd != -1) {
-        
+            
+            // open file
+            if(USE_AESD_CHAR_DEVICE==1) {
+                fd = open(OUTPUT_FILE_PATH, O_RDWR);
+            }
             // thread creation process
             pthread_t thread;
             thread_data_t* t_data = malloc(sizeof(thread_data_t));

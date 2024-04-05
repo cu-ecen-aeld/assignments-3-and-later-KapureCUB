@@ -20,6 +20,9 @@
 #include <linux/slab.h>
 #include "aesdchar.h"
 
+// assignment 9 additions
+#include "aesd_ioctl.h"
+
 
 int aesd_major =   0; // use dynamic major
 int aesd_minor =   0;
@@ -162,12 +165,95 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         return retval;
 }
 
+loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
+{
+    int idx = 0;
+    loff_t retval = 0;
+    loff_t total_buf_size = 0;
+    struct aesd_dev *dev = filp->private_data;
+
+    // check input parameters
+    if (filp == NULL || dev == NULL) 
+        return -EINVAL;
+
+    // acquire lock 
+    if (mutex_lock_interruptible(&dev->lock)) 
+        return -ERESTARTSYS;
+
+    struct aesd_buffer_entry *entry = NULL;
+    AESD_CIRCULAR_BUFFER_FOREACH(entry, &dev->buffer, idx) {
+       total_buf_size += entry->size;
+    }
+
+    // calling fixed llsek for location of offset
+    retval = fixed_size_llseek(filp, off, whence, total_buf_size);
+
+    // check if retval is valid 
+    if (retval < 0) {
+        retval = -EINVAL;
+    } else {
+        filp->f_pos = retval;
+    }
+
+    // unlock mutex
+    mutex_unlock(&dev->lock);
+
+    return retval;
+}
+
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    int retval = 0;
+    uint32_t offset = 0;
+    uint32_t write_cmd_idx = 0;
+    struct aesd_seekto seek_to;
+    struct aesd_dev *dev = filp->private_data;   
+
+    // check input parameters
+    if (filp == NULL || dev == NULL) 
+        return -EINVAL;
+
+    // check command validity
+    if (cmd != AESDCHAR_IOCSEEKTO)
+        return -ENOTTY;
+
+    // copy buffer from userspace
+    if (copy_from_user(&seek_to, (const void __user *)arg, sizeof(seek_to)))
+        return -EFAULT;
+
+    // acquire lock 
+    if (mutex_lock_interruptible(&dev->lock)) 
+        return -ERESTARTSYS;
+
+    // check command parameters
+    if ((seek_to.write_cmd > AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) ||
+        (seek_to.write_cmd_offset >= dev->buffer.entry[seek_to.write_cmd].size)) { 
+        retval = -EINVAL;
+        goto out;
+    }   
+
+    // calculate total offset 
+    while(write_cmd_idx < seek_to.write_cmd) {
+        offset += dev->buffer.entry[write_cmd_idx].size;
+        write_cmd_idx++;
+    }
+
+    filp->f_pos = (offset + seek_to.write_cmd_offset);
+    goto out;
+
+    out:
+        mutex_unlock(&dev->lock);
+        return retval;
+}
+
 struct file_operations aesd_fops = {
     .owner =    THIS_MODULE,
     .read =     aesd_read,
     .write =    aesd_write,
     .open =     aesd_open,
     .release =  aesd_release,
+    .llseek =   aesd_llseek,
+    .unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev)
